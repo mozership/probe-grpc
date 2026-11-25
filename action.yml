@@ -9,4 +9,9 @@ choices:
   protocol: [grpc, connect]
 runs:
   using: binary
-  url: https://github.com/mozership/probe-grpc/releases/download/v0.0.0/probe-grpc_{os}_{arch}
+  url: https://github.com/mozership/probe-grpc/releases/download/v0.1.0/probe-grpc_{os}_{arch}
+  checksums:
+    darwin_amd64: "0f56632fbad07d0c6990f891e2391edbc15a1f7b13bfb766f64bc2f23d0ae78c"
+    darwin_arm64: "e84cdb9f457bc759c851c3c8cf022cf4a8ce0e0e13269a1e5b1b8dddb03feda7"
+    linux_amd64: "47eff146a9a9f99095aaa1f43ab22a642ce2df9a31220ee6efcdbb2bc014dde8"
+    linux_arm64: "772edad20011397737d7b23ed311b4b7c7dbc47bc0397294bcefa36ab38936fe"
