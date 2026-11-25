@@ -8,7 +8,7 @@ require (
 	connectrpc.com/connect v1.21.1
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/mozership/probe v1.41.0
+	github.com/mozership/probe v1.42.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
