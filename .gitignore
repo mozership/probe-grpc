@@ -1,0 +1,7 @@
+/probe-grpc
+/dist/
+/e2e/action/probe-grpc
+/e2e/certs/
+/THIRD_PARTY_LICENSES
+/go.work
+/go.work.sum

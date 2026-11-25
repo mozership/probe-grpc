@@ -1,0 +1,92 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # The action run through Probe against the test server, over gRPC, with
+  # TLS and over Connect, then how much of its .proto file the calls
+  # checked, and a response that breaks other .proto files.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      # Probe resolves the action before the first job of a workflow, so it
+      # is built first.
+      - run: go build -o e2e/action/probe-grpc .
+      - name: Start the test servers
+        run: |
+          ./e2e/gen.sh
+          go build -o "$RUNNER_TEMP/testserver" ./internal/testserver
+          "$RUNNER_TEMP/testserver" -connect-port=50061 > "$RUNNER_TEMP/grpc.txt" 2>&1 &
+          "$RUNNER_TEMP/testserver" -tls -port=50052 -cert=e2e/certs/server.crt -key=e2e/certs/server.key > "$RUNNER_TEMP/grpc-tls.txt" 2>&1 &
+          for port in 50051 50052 50061; do
+            timeout 30 bash -c "until nc -z localhost $port; do sleep 1; done"
+          done
+      # A workflow can give an external action the name grpc from v1.42.0.
+      - name: Install Probe
+        uses: mozership/probe-action@831b8b6c6aa0c8a61aa75b58f36a08da5c579e83 # v1.3.0
+        with:
+          install-only: true
+          version: v1.42.0
+      - run: probe --report json="$RUNNER_TEMP/grpc.json" e2e/grpc.yml
+      - name: Coverage of the .proto file
+        run: |
+          probe coverage internal/testserver/pb/user_service.proto "$RUNNER_TEMP/grpc.json" | tee "$RUNNER_TEMP/coverage.txt"
+          grep -q "Operations: 6 of 7 checked" "$RUNNER_TEMP/coverage.txt"
+      - name: A response that breaks its .proto files fails
+        run: |
+          if probe e2e/contract-failure.yml > "$RUNNER_TEMP/failure.txt"; then
+            echo "the workflow should fail"; exit 1
+          fi
+          grep -q "is not encoded as int32 email" "$RUNNER_TEMP/failure.txt"
+      - name: What the servers logged
+        if: always()
+        run: cat "$RUNNER_TEMP/grpc.txt" "$RUNNER_TEMP/grpc-tls.txt"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+      # go fix rewrites code to what the Go version in go.mod has, such as
+      # maps.Copy for a loop that copies a map. -diff prints the rewrites
+      # instead of applying them, and fails when there is any: run go fix ./...
+      # and commit what it changes.
+      - name: go fix
+        run: go fix -diff ./...
+
+  # govulncheck fails on a vulnerability the code calls, in a module it
+  # requires or in the standard library of the Go in go.mod, which releases
+  # are built with: update the module, or the Go in go.mod.
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...

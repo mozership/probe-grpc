@@ -1,0 +1,17 @@
+# probe-grpc built from this checkout, for the workflows of e2e. Probe
+# resolves an action before the first job starts, so the executable is built
+# before probe runs:
+#
+#   go build -o e2e/action/probe-grpc . && probe e2e/grpc.yml
+name: grpc
+description: Call gRPC and Connect services, and check the calls against .proto files
+guard: [read-only, allow-host]
+params: [protocol, addr, service, method, list, body, timeout, tls, insecure, cert_file, key_file, ca_file, metadata, codec, max_messages, proto]
+res: [body, status_code, status_message, metadata, complete, contract, messages, methods, services, types, violations]
+contracts: [proto]
+choices:
+  codec: [json, proto]
+  protocol: [grpc, connect]
+runs:
+  using: binary
+  path: probe-grpc
